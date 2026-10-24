@@ -41,6 +41,12 @@ app.get("/", (req, res) => {
 // Student routes
 app.use("/api/students", require("./routes/studentRoutes"));
 
+// MCP writes use a separate token so the credential never needs to be exposed to the browser.
+app.use("/api/mcp", require("./middleware/mcpAuth"));
+app.use("/api/mcp/students", require("./routes/studentRoutes"));
+app.use("/api/mcp/settings", require("./routes/mcpSettingsRoutes"));
+app.use("/api/settings", require("./routes/siteSettingsRoutes"));
+
 // Error handler
 app.use((err, req, res, next) => {
   if (err.message.startsWith("CORS blocked")) {

@@ -32,6 +32,19 @@ async function loadStudents(search = "") {
   }
 }
 
+async function loadSiteSettings() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/settings`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Settings request failed: ${res.status}`);
+    const { data } = await res.json();
+    if (data?.backgroundColor) {
+      document.body.style.backgroundColor = data.backgroundColor;
+    }
+  } catch (error) {
+    console.error("Could not load website settings:", error);
+  }
+}
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = {};
@@ -87,3 +100,6 @@ document.getElementById("searchBtn").onclick = () => loadStudents(document.getEl
 document.getElementById("resetBtn").onclick = () => { document.getElementById("search").value = ""; loadStudents(); };
 
 loadStudents();
+loadSiteSettings();
+window.setInterval(loadSiteSettings, 5000);
+window.addEventListener("focus", loadSiteSettings);

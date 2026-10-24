@@ -19,6 +19,106 @@ User → Netlify (Frontend) → Render (Node/Express API) → MongoDB Atlas (DB)
 | GET | `/api/students/:id` | Get one (by Student ID, e.g. ST101) |
 | PUT | `/api/students/:id` | Update student |
 | DELETE | `/api/students/:id` | Delete student |
+| GET | `/api/settings` | Read the public website background setting |
+| GET | `/api/mcp/students?search=` | Authenticated Claude student search/list |
+| POST | `/api/mcp/students` | Authenticated Claude student creation |
+| PUT/DELETE | `/api/mcp/students/:id` | Authenticated Claude student update/delete |
+| PUT | `/api/mcp/settings` | Authenticated website background update for Claude |
+
+## Claude Desktop (MCP) Setup
+
+The MCP server runs on the same computer as Claude Desktop. It securely calls your
+deployed Render API; it does not connect directly to MongoDB. Student changes are
+stored in MongoDB, and the website background is stored in the `siteSettings`
+collection and refreshed by the Netlify frontend every five seconds.
+
+### 1. Create a shared secret
+
+Generate a long random token (at least 32 characters). Use the **same** value in
+the Render environment and in Claude Desktop's MCP configuration. Do not put it
+in frontend files, Git, or a public Netlify environment variable.
+
+### 2. Deploy the backend updates
+
+Push the updated `backend/` folder to your Git provider. In Render, add this
+environment variable to the existing backend service:
+
+```
+MCP_API_TOKEN=<the-long-random-token>
+```
+
+Keep the existing `MONGODB_URI` and `FRONTEND_URL` variables. Deploy the service.
+The existing public student endpoints continue to support the website; the new
+Claude-specific write endpoints require the token.
+
+### 3. Deploy the frontend updates
+
+Push the updated `frontend/` folder and let Netlify redeploy. `frontend/config.js`
+already uses the current Render API URL in this project. If your Render URL is
+different, update `API_BASE_URL` there before pushing.
+
+### 4. Install the local MCP server dependencies
+
+From PowerShell, in the project folder:
+
+```powershell
+Set-Location .\mcp-server
+npm install
+```
+
+### 5. Connect Claude Desktop
+
+Open Claude Desktop's configuration file:
+
+```
+%APPDATA%\Claude\claude_desktop_config.json
+```
+
+Create the file if it does not exist. Add this `mcpServers` entry, replacing
+`C:\absolute\path\to\project` with the full Windows path to this project and
+the token with the exact value saved in Render. Merge it with other existing
+configuration instead of overwriting it:
+
+```json
+{
+  "mcpServers": {
+    "student-management": {
+      "command": "node",
+      "args": ["C:\\absolute\\path\\to\\project\\mcp-server\\server.js"],
+      "env": {
+        "API_BASE_URL": "https://student-management-vwym.onrender.com/api",
+        "MCP_API_TOKEN": "replace-with-the-same-long-random-secret-as-render"
+      }
+    }
+  }
+}
+```
+
+Save the file and completely quit and restart Claude Desktop. Its settings should
+show the `student-management` MCP server as connected. If it does not connect,
+check that Node.js 18 or newer is installed, `npm install` completed, the file
+path is correct, and the JSON is valid.
+
+### 6. Try commands in Claude
+
+- “Add student ST202, Alex Doe, alex@example.com, Computer Science, semester 3.”
+- “Find the students in Computer Science.”
+- “Change my website background to pale blue.”
+- “Set the background to `#DCEBFF`.”
+- “Change ST202's semester to 4.”
+- “Delete student ST202.”
+
+Claude has tools for listing/searching, adding, updating, and deleting students,
+and reading/updating the background color. Background changes appear in already
+open website tabs within about five seconds. The first call can take longer if
+the Render free service has gone to sleep.
+
+### Security note
+
+The MCP routes accept only the bearer token configured above. Keep it private;
+rotate it in Render and Claude Desktop if it is exposed. The existing browser
+student CRUD endpoints are separate and remain unauthenticated as before; do not
+put the MCP token in the frontend to try to secure those routes.
 
 ---
 
@@ -59,9 +159,9 @@ Create a GitHub repository and push this whole folder. `.env` is git-ignored, so
 5. Open `https://student-api.onrender.com/api/students` to confirm it works.
 
 ### Step 5: Connect Frontend to Backend
-Edit `frontend/config.js`:
+Set the Render API base URL in `frontend/config.js`:
 ```js
-const API_URL = "https://student-api.onrender.com/api/students";
+const API_BASE_URL = "https://student-api.onrender.com/api";
 ```
 Commit and push.
 
@@ -108,12 +208,16 @@ student-management/
 │   ├── package.json
 │   ├── .env.example
 │   ├── config/database.js
-│   ├── models/Student.js
-│   ├── routes/studentRoutes.js
-│   └── controllers/studentController.js
-└── frontend/
-    ├── index.html
-    ├── style.css
-    ├── script.js
-    └── config.js
+│   ├── middleware/mcpAuth.js
+│   ├── models/
+│   ├── routes/
+│   └── controllers/
+├── frontend/
+│   ├── index.html
+│   ├── style.css
+│   ├── script.js
+│   └── config.js
+└── mcp-server/
+    ├── server.js
+    └── package.json
 ```
