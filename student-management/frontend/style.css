@@ -1,4 +1,4 @@
-:root { --primary: #1f3a68; --bg: #f2f5f9; }
+:root { --primary: green; --bg: #f2f5f9; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: Arial, sans-serif; background: var(--bg); color: #222; }
 header { background: var(--primary); color: #fff; padding: 16px; text-align: center; }
